@@ -1039,7 +1039,8 @@ class Profile(ProfileBase, ProfileRunnerBase):
                 # Suspend caller frame
                 frame_time, frame_discount, lineno, line_time, line_duration = caller_entry
                 caller_entry[4] = event_time - line_time + line_duration
-                callee_dict[(frame.f_back.f_code, frame.f_code)].append(callee_entry)
+                if frame.f_back is not None:
+                    callee_dict[(frame.f_back.f_code, frame.f_code)].append(callee_entry)
             stack.append(callee_entry)
         return local_trace
 
@@ -1071,21 +1072,22 @@ class Profile(ProfileBase, ProfileRunnerBase):
                 stack.pop()
                 stack[-1][3] = event_time
                 caller_frame = frame.f_back
-                caller_code = caller_frame.f_code
-                callee_code = frame.f_code
-                callee_entry_list = callee_dict[(caller_code, callee_code)]
-                callee_entry_list.pop()
-                call_duration = event_time - frame_time
-                if callee_entry_list:
-                    # Callee is also somewhere up the stack, so discount this
-                    # call duration from it.
-                    callee_entry_list[-1][1] += call_duration
-                self._getFileTiming(caller_frame).call(
-                    caller_code, caller_frame.f_lineno,
-                    file_timing,
-                    callee_code, call_duration - frame_discount,
-                    frame,
-                )
+                if caller_frame is not None:
+                    caller_code = caller_frame.f_code
+                    callee_code = frame.f_code
+                    callee_entry_list = callee_dict[(caller_code, callee_code)]
+                    callee_entry_list.pop()
+                    call_duration = event_time - frame_time
+                    if callee_entry_list:
+                        # Callee is also somewhere up the stack, so discount this
+                        # call duration from it.
+                        callee_entry_list[-1][1] += call_duration
+                    self._getFileTiming(caller_frame).call(
+                        caller_code, caller_frame.f_lineno,
+                        file_timing,
+                        callee_code, call_duration - frame_discount,
+                        frame,
+                    )
         return self._local_trace
 
     # profile/cProfile-like API
